@@ -13,7 +13,10 @@ import (
 	"time"
 )
 
-const token = "lemo"
+const (
+	token = "lemo"
+	logo  = "Lemo"
+)
 
 // 接收用户消息
 type TextRequestBody struct {
@@ -94,7 +97,7 @@ func makeTextResponseBody(fromUserName, toUserName, content string) ([]byte, err
 	return xml.MarshalIndent(textResponseBody, " ", "  ")
 }
 
-// server请求服务
+// server服务
 func procRequest(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	if !validateUrl(w, r) {
@@ -103,10 +106,15 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.Method == "POST" {
 		textRequestBody := parseTextRequestBody(r)
-		if textRequestBody != nil {
-			fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!",
-				textRequestBody.Content, textRequestBody.FromUserName)
-			responseTextBody, err := makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName, "Please wait a moment,10000 lemo is on the road!")
+		// 判断用户发送过来的content是Lemo地址
+		if textRequestBody != nil && isLemoAddress(textRequestBody.Content) {
+			// fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!\n",
+			// 	textRequestBody.Content, textRequestBody.FromUserName)
+			// 获取到用户的地址进行打币操作，包括判断是否在24小时之内打过币...
+
+			// 回复用户消息
+			responseTextBody, err := makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+				fmt.Sprintf("Your Lemo Address [%s] will get [10000] lemo ,please wait for some time\n", textRequestBody.Content))
 			if err != nil {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
 				return
@@ -117,6 +125,18 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 }
+
+// 验证content是一个可用的Lemo地址
+func isLemoAddress(content string) bool {
+	content = strings.ToUpper(content)
+	return strings.HasPrefix(content, strings.ToUpper(logo))
+}
+
+// 打币操作的函数
+func sendCoin(lemoAddress string) error {
+
+}
+
 func main() {
 	log.Println("Wechat Service: Start!")
 	http.HandleFunc("/", procRequest)

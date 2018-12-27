@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"fmt"
 	"github.com/lemoTestCoin/common/math"
 	"github.com/lemoTestCoin/common/secp256k1"
@@ -27,4 +28,9 @@ func zeroBytes(bytes []byte) {
 // Ecrecover returns the uncompressed public key that created the given signature.
 func Ecrecover(hash, sig []byte) ([]byte, error) {
 	return secp256k1.RecoverPubkey(hash, sig)
+}
+
+// S256 returns an instance of the secp256k1 curve.
+func S256() elliptic.Curve {
+	return secp256k1.S256()
 }

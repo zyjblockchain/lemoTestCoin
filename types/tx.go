@@ -1,18 +1,30 @@
 package types
 
 import (
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"github.com/lemoTestCoin/common"
+	"github.com/lemoTestCoin/common/hexutil"
 	"math/big"
 	"sync/atomic"
 )
+
+//go:generate gencodec -type txdata --field-override txdataMarshaling -out gen_tx_json.go
 
 var (
 	DefaultTTTL   uint64 = 2 * 60 * 60 // Transaction Time To Live, 2hours
 	ErrInvalidSig        = errors.New("invalid transaction v, r, s values")
 	TxVersion     uint8  = 1 // current transaction version. should between 0 and 128
 )
+
+type Transaction struct {
+	data txdata
+
+	hash atomic.Value
+	size atomic.Value
+	from atomic.Value
+}
 
 type txdata struct {
 	Recipient     *common.Address `json:"to" rlp:"nil"` // nil means contract creation
@@ -34,16 +46,33 @@ type txdata struct {
 	// This is only used when marshaling to JSON.
 	Hash *common.Hash `json:"hash" rlp:"-"`
 }
-type Transaction struct {
-	data txdata
+type txdataMarshaling struct {
+	GasPrice   *hexutil.Big10
+	GasLimit   hexutil.Uint64
+	Amount     *hexutil.Big10
+	Data       hexutil.Bytes
+	Expiration hexutil.Uint64
+	V          *hexutil.Big
+	R          *hexutil.Big
+	S          *hexutil.Big
+}
 
-	hash atomic.Value
-	size atomic.Value
-	from atomic.Value
+func NewTransaction(to common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, chainID uint16, expiration uint64, toName string, message string) *Transaction {
+	return newTransaction(0, TxVersion, chainID, &to, amount, gasLimit, gasPrice, data, expiration, toName, message)
+}
+
+// SignTransaction 对交易签名
+func SignTransaction(tx *Transaction, private *ecdsa.PrivateKey) *Transaction {
+	signer := MakeSigner()
+	tx, err := SignTx(tx, signer, private)
+	if err != nil {
+		panic(err)
+	}
+	return tx
 }
 
 // newTransaction
-func newTransaction(version uint8, chainID uint16, to *common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, expiration uint64, toName string, message string) *Transaction {
+func newTransaction(txType uint8, version uint8, chainID uint16, to *common.Address, amount *big.Int, gasLimit uint64, gasPrice *big.Int, data []byte, expiration uint64, toName string, message string) *Transaction {
 	if version >= 128 {
 		panic(fmt.Sprintf("invalid transaction version %d, should < 128", version))
 	}
@@ -56,7 +85,7 @@ func newTransaction(version uint8, chainID uint16, to *common.Address, amount *b
 		Data:          data,
 		Expiration:    expiration,
 		Message:       message,
-		V:             CombineV(0, version, chainID),
+		V:             CombineV(txType, version, chainID),
 		R:             new(big.Int),
 		S:             new(big.Int),
 	}
@@ -72,6 +101,23 @@ func newTransaction(version uint8, chainID uint16, to *common.Address, amount *b
 func (tx *Transaction) Type() uint8     { txType, _, _, _ := ParseV(tx.data.V); return txType }
 func (tx *Transaction) Version() uint8  { _, version, _, _ := ParseV(tx.data.V); return version }
 func (tx *Transaction) ChainID() uint16 { _, _, _, chainID := ParseV(tx.data.V); return chainID }
+
+func (tx *Transaction) Hash() common.Hash {
+	if hash := tx.hash.Load(); hash != nil {
+		return hash.(common.Hash)
+	}
+	v := rlpHash(tx)
+	tx.hash.Store(v)
+	return v
+}
+
+// MarshalJSON encodes the lemoClient RPC transaction format.
+func (tx *Transaction) MarshalJSON() ([]byte, error) {
+	hash := tx.Hash()
+	data := tx.data
+	data.Hash = &hash
+	return data.MarshalJSON()
+}
 
 // WithSignature returns a new transaction with the given signature.
 func (tx *Transaction) WithSignature(signer Signer, sig []byte) (*Transaction, error) {

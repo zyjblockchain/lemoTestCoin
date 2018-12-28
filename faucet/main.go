@@ -56,6 +56,7 @@ func makeSignature(timestamp, nonce string) string {
 
 // validateUrl 检验url是否来自微信
 func validateUrl(w http.ResponseWriter, r *http.Request) bool {
+	r.ParseForm()
 	timestamp := strings.Join(r.Form["timestamp"], "")
 	nonce := strings.Join(r.Form["nonce"], "")
 	signatureGen := makeSignature(timestamp, nonce)
@@ -100,7 +101,7 @@ func makeTextResponseBody(fromUserName, toUserName, content string) ([]byte, err
 
 // server服务
 func procRequest(w http.ResponseWriter, r *http.Request) {
-	r.ParseForm()
+
 	if !validateUrl(w, r) {
 		log.Println("Wechat service: this http request is not from Wechat platform !")
 		return
@@ -149,11 +150,11 @@ func main() {
 	log.Println("Wechat Service: Stop!")
 }
 
-// 测试用
+// // 测试用
 // func main() {
-// 	err,txMsg := types.SendCoin("Lemo83WRBAN3A8HAZQHFK48F7W8F3YRDKRJ5Y49N",10000)
+// 	err, txMsg := types.SendCoin("Lemo83J686JCF3PQDKN6AH6QF4W3P9NK2JQY9G2W", 10000)
 // 	if err != nil {
-// 		fmt.Println("post err:",err)
+// 		fmt.Println("post err:", err)
 // 	}
 // 	fmt.Println(txMsg)
 // }

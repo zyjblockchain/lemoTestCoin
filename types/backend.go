@@ -10,12 +10,13 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"time"
 )
 
 const (
 	defaultGasPrice = 1e9
 	defaultGasLimit = 50000
-	chainID         = 1
+	chainID         = 100
 )
 
 // senderLemoAddress = "Lemo83GN72GYH2NZ8BA729Z9TCT7KQ5FC3CR6DJG"
@@ -29,7 +30,7 @@ func SendCoin(content string, amount uint64) (error, string) {
 		return err, ""
 	}
 	// 生成交易
-	wxTx := NewTransaction(to, new(big.Int).SetUint64(amount), defaultGasLimit, new(big.Int).SetUint64(defaultGasPrice), []byte{}, chainID, 0, "wx", "water faucet")
+	wxTx := NewTransaction(to, new(big.Int).SetUint64(amount), defaultGasLimit, new(big.Int).SetUint64(defaultGasPrice), []byte{}, chainID, uint64(time.Now().Unix()+30*60), "wx", "water faucet")
 	// 签名交易
 	signWxTx := SignTransaction(wxTx, SenderToPrivate)
 	txData, err := signWxTx.MarshalJSON()
@@ -49,7 +50,7 @@ func SendCoin(content string, amount uint64) (error, string) {
 	fmt.Println(string(jsonData))
 	reader := bytes.NewReader(jsonData)
 	// post
-	resp, err := http.Post("http://127.0.0.1:8001", "application/json;charset=UTF-8", reader)
+	resp, err := http.Post("http://63.211.111.245:8001", "application/json;charset=UTF-8", reader)
 	if err != nil {
 		log.Println("post error:", err)
 		return err, ""

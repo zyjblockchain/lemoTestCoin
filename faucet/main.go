@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/xml"
 	"fmt"
+	"github.com/lemoTestCoin/common/store"
 	"github.com/lemoTestCoin/types"
 	"io"
 	"io/ioutil"
@@ -73,13 +74,17 @@ func validateUrl(w http.ResponseWriter, r *http.Request) bool {
 // parseTextRequestBody 解析收到的消息
 func parseTextRequestBody(r *http.Request) *TextRequestBody {
 	body, err := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
 	if err != nil {
 		log.Fatal(err)
 		return nil
 	}
 	fmt.Println(string(body))
 	requestBody := &TextRequestBody{}
-	xml.Unmarshal(body, requestBody)
+	err = xml.Unmarshal(body, requestBody)
+	if err != nil {
+		log.Println("xml.Unmarshal request error:", err)
+	}
 	return requestBody
 }
 
@@ -101,7 +106,7 @@ func makeTextResponseBody(fromUserName, toUserName, content string) ([]byte, err
 
 // server服务
 func procRequest(w http.ResponseWriter, r *http.Request) {
-
+	var responseTextBody []byte
 	if !validateUrl(w, r) {
 		log.Println("Wechat service: this http request is not from Wechat platform !")
 		return
@@ -112,20 +117,40 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		if textRequestBody != nil && fromLemoAddress(textRequestBody.Content) {
 			// fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!\n",
 			// 	textRequestBody.Content, textRequestBody.FromUserName)
-			// 获取到用户的地址进行打币操作，包括判断是否在24小时之内打过币...
-			err, txMsg := types.SendCoin(textRequestBody.Content, 10000)
+
+			// 获取用户上次申请打币的时间
+			latestTime, err := store.Getdb(textRequestBody.Content)
 			if err != nil {
-				log.Println("send coin error:", err)
+				log.Println("get db error:", err)
 				return
 			}
-			// 打印出glemo返回的交易信息
-			fmt.Println(txMsg)
-			// 回复用户消息
-			responseTextBody, err := makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-				fmt.Sprintf("Your Lemo Address [%s] will get [10000] lemo;\n please wait for some time;\n", textRequestBody.Content)+txMsg)
-			if err != nil {
-				log.Println("Wechat Service: makeTextResponseBody error:", err)
-				return
+			// 满足打币的条件:
+			// 1. 在24小时之后才能打币
+			// 2. (latestTime == 0)表示db里没有此用户记录,用户为第一次申请打币
+			if latestTime < uint64(time.Now().Unix()+30*60-24*3600) || latestTime == 0 {
+				// 获取到用户的地址进行打币操作...
+				err, txHash := types.SendCoin(textRequestBody.Content, 10)
+				if err != nil {
+					log.Println("send coin error:", err)
+					return
+				}
+				// 打印出glemo返回的交易信息
+				// fmt.Println(txHash)
+				// 回复用户消息
+				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+					fmt.Sprintf("LemoAddress {%s};\n\n transaction_hash {%s};\n", textRequestBody.Content, txHash))
+				if err != nil {
+					log.Println("Wechat Service: makeTextResponseBody error:", err)
+					return
+				}
+			} else { // 不满足打币时间
+				// 回复用户消息，为距离上次申请时间间隔小于24小时。
+				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+					fmt.Sprint("距离上次申请时间间隔太短,请等待..."))
+				if err != nil {
+					log.Println("Wechat Service: makeTextResponseBody error:", err)
+					return
+				}
 			}
 			w.Header().Set("Content-Type", "text/xml")
 			fmt.Println(string(responseTextBody))
@@ -140,7 +165,7 @@ func fromLemoAddress(content string) bool {
 	return strings.HasPrefix(content, strings.ToUpper(logo))
 }
 
-func main() {
+func main1() {
 	log.Println("Wechat Service: Start!")
 	http.HandleFunc("/", procRequest)
 	err := http.ListenAndServe(":80", nil)
@@ -150,11 +175,12 @@ func main() {
 	log.Println("Wechat Service: Stop!")
 }
 
-// // 测试用
-// func main() {
-// 	err, txMsg := types.SendCoin("Lemo83J686JCF3PQDKN6AH6QF4W3P9NK2JQY9G2W", 10000)
-// 	if err != nil {
-// 		fmt.Println("post err:", err)
-// 	}
-// 	fmt.Println(txMsg)
-// }
+// 测试用
+func main() {
+	fmt.Println("start test!")
+	err, txHash := types.SendCoin("Lemo83N65NKDY8D2FKKQY35JWJTCPZ8DSYHP7GPT", 10000)
+	if err != nil {
+		fmt.Println("post err:", err)
+	}
+	fmt.Println("tx_Hash:", txHash)
+}

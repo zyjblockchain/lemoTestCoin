@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/lemoTestCoin/common"
 	"github.com/lemoTestCoin/common/crypto"
+	"github.com/lemoTestCoin/common/store"
 	"io/ioutil"
 	"log"
 	"math/big"
@@ -50,18 +51,32 @@ func SendCoin(content string, amount uint64) (error, string) {
 	fmt.Println(string(jsonData))
 	reader := bytes.NewReader(jsonData)
 	// post
-	resp, err := http.Post("http://63.211.111.245:8001", "application/json;charset=UTF-8", reader)
+	resp, err := http.Post("http://127.0.0.1:8001", "application/json;charset=UTF-8", reader)
 	if err != nil {
 		log.Println("post error:", err)
 		return err, ""
 	}
+	// 记录用户成功发起申请交易的时间到db
+	err = store.Putdb(content, wxTx.data.Expiration)
+	if err != nil {
+		log.Println("put tx time to db error:", err)
+		return err, ""
+	}
+
 	respTx, err := ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 	if err != nil {
 		log.Println("glemo response error:", err)
 		return err, ""
 	}
-	return nil, string(respTx)
+	respon := &jsonSuccessResponse{}
+
+	err = json.Unmarshal(respTx, respon)
+	if err != nil {
+		log.Println("json.Unmarshal response error:", err)
+		return err, ""
+	}
+	return nil, respon.Result.(string)
 }
 
 type PostData struct {
@@ -69,4 +84,9 @@ type PostData struct {
 	Id      uint64            `json:"id"`
 	Method  string            `json:"method"`
 	Payload []json.RawMessage `json:"params,omitempty"`
+}
+type jsonSuccessResponse struct {
+	Version string      `json:"jsonrpc"`
+	Id      uint64      `json:"id"`
+	Result  interface{} `json:"result"`
 }

@@ -148,7 +148,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 			} else { // 不满足打币时间
 				// 回复用户消息，为距离上次申请时间间隔小于24小时。
 				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprintf("抱歉距离您上次申请时间小于24小时\n 请在 %s小时 %s分钟 之后再次申请.", (interval-(uint64(time.Now().Unix()+30*60)-latestTime))/3600, ((interval-(uint64(time.Now().Unix()+30*60)-latestTime))%3600)/60+1))
+					fmt.Sprintf("抱歉距离您上次申请时间小于24小时\n请在 %d小时 %d分钟 之后再次申请.", (interval-(uint64(time.Now().Unix()+30*60)-latestTime))/3600, ((interval-(uint64(time.Now().Unix()+30*60)-latestTime))%3600)/60))
 				if err != nil {
 					log.Println("Wechat Service: makeTextResponseBody error:", err)
 					return

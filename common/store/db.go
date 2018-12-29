@@ -42,8 +42,12 @@ func Getdb(LemoAddress string) (uint64, error) {
 		return 0, err
 	}
 	defer db.Close()
-	err = db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket([]byte("bucket"))
+	err = db.Update(func(tx *bolt.Tx) error {
+		b, err := tx.CreateBucketIfNotExists([]byte("bucket"))
+		if err != nil {
+			log.Println("tx.CreateBucketIfNotExists error:", err)
+			return err
+		}
 		byteTime := b.Get([]byte(LemoAddress))
 		// 如果db没有这个key,则返回nil
 		if byteTime == nil {

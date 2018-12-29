@@ -154,10 +154,19 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			}
-			w.Header().Set("Content-Type", "text/xml")
-			fmt.Println(string(responseTextBody))
-			fmt.Fprintf(w, string(responseTextBody))
+		} else if textRequestBody != nil && (textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币") {
+			// 给用户提示申请打币的操作
+			var err error
+			responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+				fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币."))
+			if err != nil {
+				log.Println("Wechat Service: makeTextResponseBody error:", err)
+				return
+			}
 		}
+		w.Header().Set("Content-Type", "text/xml")
+		fmt.Println(string(responseTextBody))
+		fmt.Fprintf(w, string(responseTextBody))
 	}
 }
 
@@ -178,9 +187,9 @@ func main() {
 }
 
 // // 测试用
-// func main1() {
+// func main() {
 // 	fmt.Println("start test!")
-// 	err, txHash := types.SendCoin("Lemo83N65NKDY8D2FKKQY35JWJTCPZ8DSYHP7GPT", 10000)
+// 	err, txHash := types.SendCoin("Lemo83W7HDZYS33Z745NZ2FGF37565DSF5AHJZ4J", coinNum)
 // 	if err != nil {
 // 		fmt.Println("post err:", err)
 // 	}

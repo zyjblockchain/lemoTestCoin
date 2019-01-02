@@ -16,10 +16,11 @@ import (
 )
 
 const (
-	token    = "lemo"
-	logo     = "Lemo"
-	coinNum  = uint64(10000000000000000000) // 10 lemo
-	interval = uint64(24 * 3600)            // 间隔一天
+	token          = "lemo"
+	logo           = "Lemo"
+	coinNum        = uint64(10000000000000000000) // 10 lemo
+	interval       = uint64(24 * 3600)            // 间隔一天
+	getBalanceFlag = "查询余额"                       // 用户发送查询余额请求的前缀标志位
 )
 
 // 接收用户消息
@@ -163,6 +164,28 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
 				return
 			}
+		} else if textRequestBody != nil && IsGetBalancePost(textRequestBody.Content) {
+			// 解析用户地址
+			lemoAdd := strings.TrimPrefix(textRequestBody.Content, getBalanceFlag)
+			// 验证地址为正确的lemo地址
+			if !fromLemoAddress(lemoAdd) {
+				var err error
+				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+					fmt.Sprint("输入的lemo地址不正确，请重新输入\n"))
+				if err != nil {
+					log.Println("Wechat Service: makeTextResponseBody error:", err)
+					return
+				}
+			} else {
+				// 进行查询操作
+				balance, err := types.GetBalance(lemoAdd)
+				if err != nil {
+					responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+						fmt.Sprint("查询失败，请检查输入是否正确或者联系社区人员\n"))
+				}
+				responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+					balance)
+			}
 		}
 		w.Header().Set("Content-Type", "text/xml")
 		fmt.Println(string(responseTextBody))
@@ -172,8 +195,16 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 
 // 验证content是一个可用的Lemo地址
 func fromLemoAddress(content string) bool {
+	if len(content) != 40 {
+		return false
+	}
 	content = strings.ToUpper(content)
 	return strings.HasPrefix(content, strings.ToUpper(logo))
+}
+
+// 验证用户发送的是一个查询账户余额的请求
+func IsGetBalancePost(content string) bool {
+	return strings.HasPrefix(content, getBalanceFlag)
 }
 
 func main() {

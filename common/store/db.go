@@ -5,11 +5,16 @@ import (
 	"github.com/boltdb/bolt"
 	"log"
 	"strconv"
+	"strings"
 )
+
+const dbfile = "bolt.db"
 
 // 存储 key = LemoAddress,value = tx.Expiration
 func Putdb(LemoAddress string, expiration uint64) error {
-	db, err := bolt.Open("lemo.db", 0600, nil)
+	// 把地址转换为大写
+	LemoAddress = strings.ToUpper(LemoAddress)
+	db, err := bolt.Open(dbfile, 0600, nil)
 	if err != nil {
 		log.Println("open db file error:", err)
 		return err
@@ -35,8 +40,10 @@ func Putdb(LemoAddress string, expiration uint64) error {
 
 // 获得db中LemoAddress对应的时间戳
 func Getdb(LemoAddress string) (uint64, error) {
+	// 把地址转换为大写
+	LemoAddress = strings.ToUpper(LemoAddress)
 	var time uint64
-	db, err := bolt.Open("lemo.db", 0600, nil)
+	db, err := bolt.Open(dbfile, 0600, nil)
 	if err != nil {
 		log.Println("open db file error:", err)
 		return 0, err

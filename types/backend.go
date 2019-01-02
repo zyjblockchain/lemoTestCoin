@@ -48,6 +48,10 @@ func SendCoin(content string, amount uint64) (error, string) {
 		Payload: []json.RawMessage{txData},
 	}
 	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Println("marshal error:", err)
+		return err, ""
+	}
 	fmt.Println(string(jsonData))
 	reader := bytes.NewReader(jsonData)
 	// post
@@ -89,4 +93,43 @@ type jsonSuccessResponse struct {
 	Version string      `json:"jsonrpc"`
 	Id      uint64      `json:"id"`
 	Result  interface{} `json:"result"`
+}
+
+// 查询用户账户余额
+func GetBalance(lemoAddress string) (string, error) {
+
+	jsonlemoAdd, err := json.Marshal(lemoAddress)
+	if err != nil {
+		log.Println("json 102 marshal error:", err)
+	}
+	data := PostData{
+		Version: "2.0",
+		Id:      1,
+		Method:  "account_getBalance",
+		Payload: []json.RawMessage{jsonlemoAdd},
+	}
+	jsonData, err := json.Marshal(data)
+	if err != nil {
+		log.Println("json 112 marshal error:", err)
+		return "", err
+	}
+	reader := bytes.NewReader(jsonData)
+	resp, err := http.Post("http://127.0.0.1:8001", "application/json;charset=UTF-8", reader)
+	if err != nil {
+		log.Println("post error:", err)
+		return "", err
+	}
+	byteResp, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		log.Println("read response error:", err)
+		return "", err
+	}
+	defer resp.Body.Close()
+	respon := new(jsonSuccessResponse)
+	err = json.Unmarshal(byteResp, respon)
+	if err != nil {
+		log.Println("unmarshal error:", err)
+		return "", nil
+	}
+	return respon.Result.(string), nil
 }

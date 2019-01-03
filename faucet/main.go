@@ -23,13 +23,22 @@ const (
 	getBalanceFlag = "查询余额"                       // 用户发送查询余额请求的前缀标志位
 )
 
+// 判断request的类型
+// TODO 目前只有区别扫码请求和普通文本的请求，如果将来要更加细分其他请求可以直接在此结构体下面加上字段来判断
+type JudgeRequestType struct {
+	XMLName      xml.Name `xml:"xml"`
+	ToUserName   string
+	FromUserName string
+	MsgType      string
+}
+
 // 接收用户文本消息
 type TextRequestBody struct {
 	XMLName      xml.Name `xml:"xml"`
 	ToUserName   string
 	FromUserName string
 	CreateTime   time.Duration
-	MagType      string
+	MsgType      string
 	Content      string
 	MsgId        int
 }
@@ -40,7 +49,7 @@ type EventRequestBody struct {
 	ToUserName   string
 	FromUserName string
 	CreateTime   time.Duration
-	MagType      string
+	MsgType      string
 	Event        string
 	EventKey     string
 	Ticket       string
@@ -87,38 +96,37 @@ func validateUrl(w http.ResponseWriter, r *http.Request) bool {
 }
 
 // parseTextRequestBody 解析收到文本的消息
-func parseTextRequestBody(r *http.Request) *TextRequestBody {
-	body, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil {
-		log.Println("io read error", err)
-		return nil
-	}
-	fmt.Println(string(body))
+func parseTextRequestBody(body []byte) *TextRequestBody {
+	// body, err := ioutil.ReadAll(r.Body)
+	// defer r.Body.Close()
+	// if err != nil {
+	// 	log.Println("io read error", err)
+	// 	return nil
+	// }
 	requestBody := &TextRequestBody{}
-	err = xml.Unmarshal(body, requestBody)
+	err := xml.Unmarshal(body, requestBody)
 	if err != nil {
 		log.Println("xml.Unmarshal request error:", err)
 	}
+	fmt.Println("TextRequestBody 结构体:", requestBody) // 调试用
 	return requestBody
 }
 
 // 解析接收到的扫码事件的请求
-func parseEventRequestBody(r *http.Request) *EventRequestBody {
-	body, err := ioutil.ReadAll(r.Body)
-	defer r.Body.Close()
-	if err != nil {
-		log.Println("io read error", err)
-		return nil
-	}
-	fmt.Println(string(body))
+func parseEventRequestBody(body []byte) *EventRequestBody {
+	// body, err := ioutil.ReadAll(r.Body)
+	// defer r.Body.Close()
+	// if err != nil {
+	// 	log.Println("io read error", err)
+	// 	return nil
+	// }
 	requestBody := &EventRequestBody{}
-	err = xml.Unmarshal(body, requestBody)
+	err := xml.Unmarshal(body, requestBody)
 	if err != nil {
 		log.Println("xml.Unmarshal request error:", err)
 	}
+	fmt.Println("EventRequestBody 结构体:", requestBody) // 调试用
 	return requestBody
-
 }
 
 // value2CDATA
@@ -140,19 +148,35 @@ func makeTextResponseBody(fromUserName, toUserName, content string) ([]byte, err
 // server服务
 func procRequest(w http.ResponseWriter, r *http.Request) {
 	var responseTextBody []byte
+	// 检验url是否来自微信
 	if !validateUrl(w, r) {
 		log.Println("Wechat service: this http request is not from Wechat platform !")
 		return
 	}
-
-	fmt.Println("请求数据内容的长度:", r.ContentLength)
-	fmt.Println("请求方法:", r.Method)
-	var Msg string
+	fmt.Println("请求方法:", r.Method) // 调试用
 	// 微信端post请求
 	if r.Method == "POST" {
-		if r.ContentLength == 400 || r.ContentLength == 413 { // 满足扫码请求content长度
+		// 读取请求的body
+		body, err := ioutil.ReadAll(r.Body)
+		defer r.Body.Close()
+		if err != nil {
+			log.Println("io read error", err)
+		}
+		fmt.Println(string(body)) // 调试用
+
+		judgeMsgType := &JudgeRequestType{}
+		// 反序列化出body中的MsgType字段放在结构体 JudgeRequestType中
+		err = xml.Unmarshal(body, judgeMsgType)
+		if err != nil {
+			log.Println("xml.Unmarshal error:", err)
+		}
+		fmt.Println("judgeMsgType:", judgeMsgType) // 调试用
+
+		if judgeMsgType.MsgType == "event" { // 如果是事件请求则为扫码
 			var err error
-			getRequestBody := parseEventRequestBody(r) // 解析扫码事件请求
+			var Msg string
+			getRequestBody := parseEventRequestBody(body)     // 解析扫码事件请求
+			fmt.Println("EventKey:", getRequestBody.EventKey) // 调试用
 			// 新用户扫码关注推送消息如下
 			if getRequestBody.Event == "subscribe" {
 				Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
@@ -165,8 +189,9 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
 				return
 			}
-		} else { // 微信端发送文本消息的处理
-			textRequestBody := parseTextRequestBody(r) // 解析文本请求
+		} else if judgeMsgType.MsgType == "text" { // 微信端发送文本消息的处理
+
+			textRequestBody := parseTextRequestBody(body) // 解析文本请求
 			// 判断用户发送过来的文本是Lemo地址
 			if textRequestBody != nil && fromLemoAddress(textRequestBody.Content) {
 				// fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!\n",
@@ -243,6 +268,9 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					fmt.Sprint("输入数据请求无效。"))
 			}
 
+		} else { // 如果用户发送的消息是图片、视频、音频等类型，则不处理，以后有需求直接在此处扩展即可。
+			responseTextBody, _ = makeTextResponseBody(judgeMsgType.ToUserName, judgeMsgType.FromUserName,
+				fmt.Sprint("目前公众号还不支持此类消息,请谅解。"))
 		}
 
 		w.Header().Set("Content-Type", "text/xml")

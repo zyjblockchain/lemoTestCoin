@@ -144,16 +144,23 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		log.Println("Wechat service: this http request is not from Wechat platform !")
 		return
 	}
+
 	fmt.Println("请求数据内容的长度:", r.ContentLength)
 	fmt.Println("请求方法:", r.Method)
-
+	var Msg string
 	// 微信端post请求
 	if r.Method == "POST" {
 		if r.ContentLength == 400 || r.ContentLength == 413 { // 满足扫码请求content长度
-			getRequestBody := parseEventRequestBody(r) // 解析扫码事件请求
 			var err error
-			responseTextBody, err = makeTextResponseBody(getRequestBody.ToUserName, getRequestBody.FromUserName,
-				fmt.Sprint("测试扫码关注推送消息功能"))
+			getRequestBody := parseEventRequestBody(r) // 解析扫码事件请求
+			// 新用户扫码关注推送消息如下
+			if getRequestBody.Event == "subscribe" {
+				Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
+			} else if getRequestBody.Event == "SCAN" { // 已关注的用户扫码进公众号
+				Msg = "感谢使用Lemo测试币水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+			}
+
+			responseTextBody, err = makeTextResponseBody(getRequestBody.ToUserName, getRequestBody.FromUserName, Msg)
 			if err != nil {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
 				return
@@ -203,7 +210,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				// 给用户提示申请打币的操作
 				var err error
 				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币."))
+					fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币。"))
 				if err != nil {
 					log.Println("Wechat Service: makeTextResponseBody error:", err)
 					return
@@ -233,7 +240,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				}
 			} else { // 用户发送未定义的消息给公众号的返回
 				responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprint("输入数据有误请重新输入."))
+					fmt.Sprint("输入数据请求无效。"))
 			}
 
 		}

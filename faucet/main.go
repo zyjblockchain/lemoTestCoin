@@ -23,7 +23,7 @@ const (
 	getBalanceFlag = "查询余额"                       // 用户发送查询余额请求的前缀标志位
 )
 
-// 接收用户消息
+// 接收用户文本消息
 type TextRequestBody struct {
 	XMLName      xml.Name `xml:"xml"`
 	ToUserName   string
@@ -32,6 +32,18 @@ type TextRequestBody struct {
 	MagType      string
 	Content      string
 	MsgId        int
+}
+
+// 扫码事件响应数据结构
+type EventRequestBody struct {
+	XMLName      xml.Name `xml:"xml"`
+	ToUserName   string
+	FromUserName string
+	CreateTime   time.Duration
+	MagType      string
+	Event        string
+	EventKey     string
+	Ticket       string
 }
 
 // 响应用户的消息
@@ -74,12 +86,12 @@ func validateUrl(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
-// parseTextRequestBody 解析收到的消息
+// parseTextRequestBody 解析收到文本的消息
 func parseTextRequestBody(r *http.Request) *TextRequestBody {
 	body, err := ioutil.ReadAll(r.Body)
 	defer r.Body.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Println("io read error", err)
 		return nil
 	}
 	fmt.Println(string(body))
@@ -89,6 +101,24 @@ func parseTextRequestBody(r *http.Request) *TextRequestBody {
 		log.Println("xml.Unmarshal request error:", err)
 	}
 	return requestBody
+}
+
+// 解析接收到的扫码事件的请求
+func parseEventRequestBody(r *http.Request) *EventRequestBody {
+	body, err := ioutil.ReadAll(r.Body)
+	defer r.Body.Close()
+	if err != nil {
+		log.Println("io read error", err)
+		return nil
+	}
+	fmt.Println(string(body))
+	requestBody := &EventRequestBody{}
+	err = xml.Unmarshal(body, requestBody)
+	if err != nil {
+		log.Println("xml.Unmarshal request error:", err)
+	}
+	return requestBody
+
 }
 
 // value2CDATA
@@ -114,79 +144,96 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		log.Println("Wechat service: this http request is not from Wechat platform !")
 		return
 	}
-	if r.Method == "POST" {
-		textRequestBody := parseTextRequestBody(r)
-		// 判断用户发送过来的content是Lemo地址
-		if textRequestBody != nil && fromLemoAddress(textRequestBody.Content) {
-			// fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!\n",
-			// 	textRequestBody.Content, textRequestBody.FromUserName)
+	fmt.Println("请求数据内容的长度:", r.ContentLength)
+	fmt.Println("请求方法:", r.Method)
 
-			// 获取用户上次申请打币的时间
-			latestTime, err := store.Getdb(textRequestBody.Content)
-			if err != nil {
-				log.Println("get db error:", err)
-				return
-			}
-			// 满足打币的条件:
-			// 1. 在24小时之后才能打币
-			// 2. (latestTime == 0)表示db里没有此用户记录,用户为第一次申请打币
-			if latestTime+interval < uint64(time.Now().Unix()+30*60) || latestTime == 0 {
-				// 获取到用户的地址进行打币操作...
-				err, txHash := types.SendCoin(textRequestBody.Content, coinNum)
-				if err != nil {
-					log.Println("send coin error:", err)
-					return
-				}
-				// 打印出glemo返回的交易信息
-				// fmt.Println(txHash)
-				// 回复用户消息
-				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprintf("请再次确认您的lemo地址\n {%s} \n\n 10LEMO测试币将在1个工作日内发放至您的钱包.\n 请添加技术社区客服 Lucy180619 进入Lemo技术社区.\r\n 此次交易的哈希为{%s}\n", textRequestBody.Content, txHash))
-				if err != nil {
-					log.Println("Wechat Service: makeTextResponseBody error:", err)
-					return
-				}
-			} else { // 不满足打币时间
-				// 回复用户消息，为距离上次申请时间间隔小于24小时。
-				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprintf("抱歉距离您上次申请时间小于24小时\n请在 %d小时 %d分钟 之后再次申请.", (interval-(uint64(time.Now().Unix()+30*60)-latestTime))/3600, ((interval-(uint64(time.Now().Unix()+30*60)-latestTime))%3600)/60))
-				if err != nil {
-					log.Println("Wechat Service: makeTextResponseBody error:", err)
-					return
-				}
-			}
-		} else if textRequestBody != nil && (textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币") {
-			// 给用户提示申请打币的操作
+	// 微信端post请求
+	if r.Method == "POST" {
+		if r.ContentLength == 400 || r.ContentLength == 413 { // 满足扫码请求content长度
+			getRequestBody := parseEventRequestBody(r) // 解析扫码事件请求
 			var err error
-			responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-				fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币."))
+			responseTextBody, err = makeTextResponseBody(getRequestBody.ToUserName, getRequestBody.FromUserName,
+				fmt.Sprint("测试扫码关注推送消息功能"))
 			if err != nil {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
 				return
 			}
-		} else if textRequestBody != nil && IsGetBalancePost(textRequestBody.Content) {
-			// 解析用户地址
-			lemoAdd := strings.TrimPrefix(textRequestBody.Content, getBalanceFlag)
-			// 验证地址为正确的lemo地址
-			if !fromLemoAddress(lemoAdd) {
+		} else { // 微信端发送文本消息的处理
+			textRequestBody := parseTextRequestBody(r) // 解析文本请求
+			// 判断用户发送过来的文本是Lemo地址
+			if textRequestBody != nil && fromLemoAddress(textRequestBody.Content) {
+				// fmt.Printf("Wechat service: Received text msg [%s] from user [%s]!\n",
+				// 	textRequestBody.Content, textRequestBody.FromUserName)
+
+				// 获取用户上次申请打币的时间
+				latestTime, err := store.Getdb(textRequestBody.Content)
+				if err != nil {
+					log.Println("get db error:", err)
+					return
+				}
+				// 满足打币的条件:
+				// 1. 在24小时之后才能打币
+				// 2. (latestTime == 0)表示db里没有此用户记录,用户为第一次申请打币
+				if latestTime+interval < uint64(time.Now().Unix()+30*60) || latestTime == 0 {
+					// 获取到用户的地址进行打币操作...
+					err, txHash := types.SendCoin(textRequestBody.Content, coinNum)
+					if err != nil {
+						log.Println("send coin error:", err)
+						return
+					}
+					// 打印出glemo返回的交易信息
+					// fmt.Println(txHash)
+					// 回复用户消息
+					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+						fmt.Sprintf("请再次确认您的lemo地址\n {%s} \n\n 10LEMO测试币将在1个工作日内发放至您的钱包.\n 请添加技术社区客服 Lucy180619 进入Lemo技术社区.\r\n 此次交易的哈希为{%s}\n", textRequestBody.Content, txHash))
+					if err != nil {
+						log.Println("Wechat Service: makeTextResponseBody error:", err)
+						return
+					}
+				} else { // 不满足打币时间
+					// 回复用户消息，为距离上次申请时间间隔小于24小时。
+					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+						fmt.Sprintf("抱歉距离您上次申请时间小于24小时\n请在 %d小时 %d分钟 之后再次申请.", (interval-(uint64(time.Now().Unix()+30*60)-latestTime))/3600, ((interval-(uint64(time.Now().Unix()+30*60)-latestTime))%3600)/60))
+					if err != nil {
+						log.Println("Wechat Service: makeTextResponseBody error:", err)
+						return
+					}
+				}
+			} else if textRequestBody != nil && (textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币") {
+				// 给用户提示申请打币的操作
 				var err error
 				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprint("输入的lemo地址不正确，请重新输入\n"))
+					fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币."))
 				if err != nil {
 					log.Println("Wechat Service: makeTextResponseBody error:", err)
 					return
 				}
-			} else {
-				// 进行查询操作
-				balance, err := types.GetBalance(lemoAdd)
-				if err != nil {
+			} else if textRequestBody != nil && IsGetBalancePost(textRequestBody.Content) {
+				// 解析用户地址
+				lemoAdd := strings.TrimPrefix(textRequestBody.Content, getBalanceFlag)
+				// 验证地址为正确的lemo地址
+				if !fromLemoAddress(lemoAdd) {
+					var err error
+					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+						fmt.Sprint("输入的lemo地址不正确，请重新输入\n"))
+					if err != nil {
+						log.Println("Wechat Service: makeTextResponseBody error:", err)
+						return
+					}
+				} else {
+					// 进行查询操作
+					balance, err := types.GetBalance(lemoAdd)
+					if err != nil {
+						responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+							fmt.Sprint("查询失败，请检查输入是否正确或者联系社区人员\n"))
+					}
 					responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-						fmt.Sprint("查询失败，请检查输入是否正确或者联系社区人员\n"))
+						balance)
 				}
-				responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					balance)
 			}
+
 		}
+
 		w.Header().Set("Content-Type", "text/xml")
 		fmt.Println(string(responseTextBody))
 		fmt.Fprintf(w, string(responseTextBody))

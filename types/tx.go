@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"github.com/lemoTestCoin/common"
 	"github.com/lemoTestCoin/common/hexutil"
+	"github.com/lemoTestCoin/common/rlp"
+	"io"
 	"math/big"
 	"sync/atomic"
 )
@@ -96,6 +98,22 @@ func newTransaction(txType uint8, version uint8, chainID uint16, to *common.Addr
 		d.GasPrice.Set(gasPrice)
 	}
 	return &Transaction{data: d}
+}
+
+// EncodeRLP implements rlp.Encoder
+func (tx *Transaction) EncodeRLP(w io.Writer) error {
+	return rlp.Encode(w, &tx.data)
+}
+
+// DecodeRLP implements rlp.Decoder
+func (tx *Transaction) DecodeRLP(s *rlp.Stream) error {
+	_, size, _ := s.Kind()
+	err := s.Decode(&tx.data)
+	if err == nil {
+		tx.size.Store(common.StorageSize(rlp.ListSize(size)))
+	}
+
+	return err
 }
 
 func (tx *Transaction) Type() uint8     { txType, _, _, _ := ParseV(tx.data.V); return txType }

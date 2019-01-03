@@ -226,10 +226,14 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					if err != nil {
 						responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
 							fmt.Sprint("查询失败，请检查输入是否正确或者联系社区人员\n"))
+					} else {
+						responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+							balance)
 					}
-					responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-						balance)
 				}
+			} else { // 用户发送未定义的消息给公众号的返回
+				responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
+					fmt.Sprint("输入数据有误请重新输入."))
 			}
 
 		}

@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	token          = "lemo"
+	token          = "lemo" // 用于验证来自绑定的微信公众号的请求的token，与公众号中的设置相同
 	logo           = "Lemo"
 	coinNum        = uint64(10000000000000000000) // 10 lemo
 	interval       = uint64(24 * 3600)            // 间隔一天
@@ -219,6 +219,12 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					}
 					// 打印出glemo返回的交易信息
 					// fmt.Println(txHash)
+
+					// 标记用户标签为 “开发者”,为了不能重复标记，通过判断用户最新打币时间来判断，当最新打币时间 latestTime==0 则此用户第一次申请打币则标记
+					if latestTime == 0 {
+						// 	todo
+					}
+
 					// 回复用户消息
 					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
 						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n10LEMO测试币将在1个工作日内发放至您的钱包。请添加技术社区客服 Lucy180619 进入Lemo技术社区。\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))

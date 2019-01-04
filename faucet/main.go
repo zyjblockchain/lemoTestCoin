@@ -4,7 +4,8 @@ import (
 	"crypto/sha1"
 	"encoding/xml"
 	"fmt"
-	"github.com/lemoTestCoin/common/store"
+	"github.com/lemoTestCoin/manager"
+	"github.com/lemoTestCoin/store"
 	"github.com/lemoTestCoin/types"
 	"io"
 	"io/ioutil"
@@ -21,6 +22,9 @@ const (
 	coinNum        = uint64(10000000000000000000) // 10 lemo
 	interval       = uint64(24 * 3600)            // 间隔一天
 	getBalanceFlag = "查询余额"                       // 用户发送查询余额请求的前缀标志位
+	AppID          = "wx1f6db98d761e4679"
+	AppSecret      = "fca7d817f6706c240cfbef7d554db891"
+	TagName        = "开发者"
 )
 
 // 判断request的类型
@@ -154,6 +158,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	fmt.Println("请求方法:", r.Method) // 调试用
+
 	// 微信端post请求
 	if r.Method == "POST" {
 		// 读取请求的body
@@ -222,7 +227,12 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 
 					// 标记用户标签为 “开发者”,为了不能重复标记，通过判断用户最新打币时间来判断，当最新打币时间 latestTime==0 则此用户第一次申请打币则标记
 					if latestTime == 0 {
-						// 	todo
+						err = manager.AddTagForUser(AccessToken, []string{textRequestBody.FromUserName}, tagId)
+						if err != nil {
+							log.Println("给用户标记标签error:", err)
+							return
+						}
+
 					}
 
 					// 回复用户消息
@@ -303,10 +313,40 @@ func IsGetBalancePost(content string) bool {
 	return strings.HasPrefix(content, getBalanceFlag)
 }
 
+// 存储access_token 的全局变量
+var AccessToken string
+var tagId int
+
 func main() {
 	log.Println("Wechat Service: Start!")
+
+	// --------------------获取access_token----------------------------- //
+	// 获取access_token
+	var err error
+	AccessToken, err = manager.GetAccessToken(AppID, AppSecret)
+	fmt.Println("启动时生成的access_token:", AccessToken)
+	if err != nil {
+		log.Fatal("get access_token error:", err)
+
+	}
+	// 定时更新access_token
+	go manager.Timer(AppID, AppSecret, AccessToken)
+	// --------------------------------------------------------------- //
+
+	// ----------------创建一个名为"开发者"的标签分组------------------- //
+	// 判断是否存在名为"开发者"的标签分组，如果有则返回标签id
+	// todo
+
+	// 如果没有则创建标签,并返回标签id
+	tagId, err = manager.CreateTag(AccessToken, TagName)
+	if err != nil {
+		log.Fatal("craete tag error:", err)
+	}
+	fmt.Println("创建的标签id,tagId=", tagId) // 调试用
+	// -------------------------------------------------------------- //
+
 	http.HandleFunc("/", procRequest)
-	err := http.ListenAndServe(":80", nil)
+	err = http.ListenAndServe(":80", nil)
 	if err != nil {
 		log.Fatal("Wechat Service: ListenAndServer failed,", err)
 	}

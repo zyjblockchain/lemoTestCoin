@@ -1,4 +1,4 @@
-package main
+package manager
 
 import (
 	"bytes"
@@ -7,11 +7,7 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
-)
-
-const (
-	AppID     = "wx1f6db98d761e4679"
-	AppSecret = "fca7d817f6706c240cfbef7d554db891"
+	"time"
 )
 
 // access_token 返回的数据结构类型
@@ -94,7 +90,7 @@ func CreateTag(accessToken, name string) (int, error) {
 }
 
 // 3.为申请打币的用户添加进 id = "开发者"标签 的分组，accessToken为access_token，openIds为用户的open id集合，id 为标签id，由微信分配
-func AddTagToUser(accessToken string, openIds []string, id int) error {
+func AddTagForUser(accessToken string, openIds []string, id int) error {
 	Url := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/tags/members/batchtagging?access_token=%s", accessToken)
 	// 请求的数据
 	playtag := &PlayTag{
@@ -119,4 +115,21 @@ func AddTagToUser(accessToken string, openIds []string, id int) error {
 	fmt.Println("批量为用户打标签post响应数据：", string(res))
 
 	return nil
+}
+
+// 4.定时器函数，定时每2小时更新access_token,AccessToken为更新到的全局变量
+func Timer(appId, appSecret, AccessToken string) {
+	tick := time.NewTicker(7100 * time.Second)
+	for {
+		select {
+		case <-tick.C:
+			var err error
+			AccessToken, err = GetAccessToken(appId, appSecret)
+			if err != nil {
+				log.Println("get access_token error:", err)
+				return
+			}
+			fmt.Println("定时更新后的access_token:", AccessToken) // 调试用
+		}
+	}
 }

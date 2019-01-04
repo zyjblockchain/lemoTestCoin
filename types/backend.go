@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/lemoTestCoin/common"
 	"github.com/lemoTestCoin/common/crypto"
-	"github.com/lemoTestCoin/common/store"
+	"github.com/lemoTestCoin/store"
 	"io/ioutil"
 	"log"
 	"math/big"

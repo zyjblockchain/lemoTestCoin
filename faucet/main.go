@@ -19,12 +19,12 @@ import (
 const (
 	token          = "lemo" // 用于验证来自绑定的微信公众号的请求的token，与公众号中的设置相同
 	logo           = "Lemo"
-	coinNum        = uint64(10000000000000000000) // 10 lemo
-	interval       = uint64(24 * 3600)            // 间隔一天
-	getBalanceFlag = "查询余额"                       // 用户发送查询余额请求的前缀标志位
-	AppID          = "wx1f6db98d761e4679"
-	AppSecret      = "fca7d817f6706c240cfbef7d554db891"
-	TagName        = "开发者"
+	coinNum        = uint64(10000000000000000000)       // 10 lemo
+	interval       = uint64(24 * 3600)                  // 每个lemo地址限制申请测试币的间隔时间为一天
+	getBalanceFlag = "查询余额"                             // 用户发送查询余额请求的前缀标志位
+	AppID          = "wx1f6db98d761e4679"               // 绑定公众号的appid ,只有绑定此公众号上发送过来的用户才能被标记。其他链接此水龙头的公众号上的用户能申请到测试币但是不能被标记。
+	AppSecret      = "fca7d817f6706c240cfbef7d554db891" // 绑定公众号的app秘钥
+	TagName        = "开发者"                              // 标记申请测试币的微信用户的组名
 )
 
 // 存储access_token 的全局变量

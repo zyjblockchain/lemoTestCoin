@@ -129,7 +129,7 @@ func AddTagForUser(accessToken string, openIds []string, id int) error {
 
 // 4.定时器函数，定时每2小时更新access_token,AccessToken为更新到的全局变量
 func Timer(appId, appSecret, AccessToken string) {
-	tick := time.NewTicker(7100 * time.Second)
+	tick := time.NewTicker(7140 * time.Second) // 提前1分钟进行更新
 	for {
 		select {
 		case <-tick.C:

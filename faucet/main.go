@@ -108,7 +108,7 @@ func parseTextRequestBody(body []byte) *TextRequestBody {
 	if err != nil {
 		log.Println("xml.Unmarshal request error:", err)
 	}
-	fmt.Println("TextRequestBody 结构体:", requestBody) // 调试用
+	// fmt.Println("TextRequestBody 结构体:", requestBody) // 调试用
 	return requestBody
 }
 
@@ -125,7 +125,7 @@ func parseEventRequestBody(body []byte) *EventRequestBody {
 	if err != nil {
 		log.Println("xml.Unmarshal request error:", err)
 	}
-	fmt.Println("EventRequestBody 结构体:", requestBody) // 调试用
+	// fmt.Println("EventRequestBody 结构体:", requestBody) // 调试用
 	return requestBody
 }
 
@@ -170,20 +170,24 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Println("xml.Unmarshal error:", err)
 		}
-		fmt.Println("judgeMsgType:", judgeMsgType) // 调试用
+		fmt.Println("post请求的MsgType:", judgeMsgType.MsgType) // 调试用
 
 		if judgeMsgType.MsgType == "event" { // 如果是事件请求则为扫码
 			var err error
 			var Msg string
 			getRequestBody := parseEventRequestBody(body)     // 解析扫码事件请求
 			fmt.Println("EventKey:", getRequestBody.EventKey) // 调试用
-			// 新用户扫码关注推送消息如下
-			if getRequestBody.Event == "subscribe" {
-				Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
-			} else if getRequestBody.Event == "SCAN" { // 已关注的用户扫码进公众号
-				Msg = "感谢使用Lemo测试币水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+			// 判断新用户扫的二维码是否为我们水龙头推广的二维码
+			if getRequestBody.EventKey == "" { // 满足此条件为微信公众号自带的二维码，说明只是用户扫此二维码关注公众号的操作
+				Msg = "感谢关注LemoChain，请添加技术社区客服 Lucy180619 进入Lemo技术社区。"
+			} else {
+				// 新用户扫码关注推送消息如下
+				if getRequestBody.Event == "subscribe" {
+					Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
+				} else if getRequestBody.Event == "SCAN" { // 已关注的用户扫码进公众号
+					Msg = "感谢使用Lemo测试币水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+				}
 			}
-
 			responseTextBody, err = makeTextResponseBody(getRequestBody.ToUserName, getRequestBody.FromUserName, Msg)
 			if err != nil {
 				log.Println("Wechat Service: makeTextResponseBody error:", err)
@@ -217,7 +221,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					// fmt.Println(txHash)
 					// 回复用户消息
 					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-						fmt.Sprintf("请再次确认您的lemo地址\n {%s} \n\n 10LEMO测试币将在1个工作日内发放至您的钱包.\n 请添加技术社区客服 Lucy180619 进入Lemo技术社区.\r\n 此次交易的哈希为{%s}\n", textRequestBody.Content, txHash))
+						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n10LEMO测试币将在1个工作日内发放至您的钱包。请添加技术社区客服 Lucy180619 进入Lemo技术社区。\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))
 					if err != nil {
 						log.Println("Wechat Service: makeTextResponseBody error:", err)
 						return

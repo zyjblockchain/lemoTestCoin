@@ -39,6 +39,16 @@ type TagName struct {
 	Name string `json:"name"`
 }
 
+// 获取公众号已创建的标签的数据结构
+type FindTagName struct {
+	Tags []TagMsg `json:"tags"`
+}
+type TagMsg struct {
+	Id    int    `json:"id"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
 // 1.获取到公众号的access_token 注：access_token有效期为2小时，access_token是调用微信端api的唯一识别码。
 func GetAccessToken(appId, appSecret string) (string, error) {
 	Url := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid=%s&secret=%s", appId, appSecret)
@@ -132,4 +142,26 @@ func Timer(appId, appSecret, AccessToken string) {
 			fmt.Println("定时更新后的access_token:", AccessToken) // 调试用
 		}
 	}
+}
+
+// 5.查找公众号已创建的标签中是否存在给定name的标签,如果存在则返回标签对应的tagid,如果不存在则返回0
+func FindTagToName(AccessToken, name string) int {
+	url := fmt.Sprintf("https://api.weixin.qq.com/cgi-bin/tags/get?access_token=%s", AccessToken)
+	resp, err := http.Get(url)
+	if err != nil {
+		log.Println("获取公众号已创建的标签失败:", err)
+	}
+	res, _ := ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+	// 反序列化得到findTagName的结构体
+	findTagName := &FindTagName{Tags: []TagMsg{}}
+	json.Unmarshal(res, findTagName)
+
+	// 找出是否有名字为name的tag
+	for i := 0; i < len(findTagName.Tags); i++ {
+		if findTagName.Tags[i].Name == name {
+			return findTagName.Tags[i].Id
+		}
+	}
+	return 0
 }

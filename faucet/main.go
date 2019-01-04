@@ -27,6 +27,12 @@ const (
 	TagName        = "开发者"
 )
 
+// 存储access_token 的全局变量
+var AccessToken string
+
+// 存储标签的全局变量
+var tagId int
+
 // 判断request的类型
 // TODO 目前只有区别扫码请求和普通文本的请求，如果将来要更加细分其他请求可以直接在此结构体下面加上字段来判断
 type JudgeRequestType struct {
@@ -313,10 +319,6 @@ func IsGetBalancePost(content string) bool {
 	return strings.HasPrefix(content, getBalanceFlag)
 }
 
-// 存储access_token 的全局变量
-var AccessToken string
-var tagId int
-
 func main() {
 	log.Println("Wechat Service: Start!")
 
@@ -334,15 +336,20 @@ func main() {
 	// --------------------------------------------------------------- //
 
 	// ----------------创建一个名为"开发者"的标签分组------------------- //
-	// 判断是否存在名为"开发者"的标签分组，如果有则返回标签id
-	// todo
-
-	// 如果没有则创建标签,并返回标签id
-	tagId, err = manager.CreateTag(AccessToken, TagName)
-	if err != nil {
-		log.Fatal("craete tag error:", err)
+	// 查找是否存在名为"开发者"的标签分组，如果有则返回标签tagid
+	id := manager.FindTagToName(AccessToken, TagName)
+	if id == 0 { // 表示未找到此name的tag
+		// 如果没有则创建标签,并返回标签id
+		tagId, err = manager.CreateTag(AccessToken, TagName)
+		if err != nil {
+			log.Fatal("craete tag error:", err)
+		}
+		fmt.Println("创建的标签id,tagId=", tagId) // 调试用
+	} else { // 存在这个标签，则把返回的标签id存储到全局变量tagId中
+		tagId = id
+		fmt.Println("存在查找的名字的标签,tagid=", tagId) // 调试用
 	}
-	fmt.Println("创建的标签id,tagId=", tagId) // 调试用
+
 	// -------------------------------------------------------------- //
 
 	http.HandleFunc("/", procRequest)

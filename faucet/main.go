@@ -21,9 +21,9 @@ const (
 	logo           = "Lemo"
 	coinNum        = uint64(10000000000000000000)       // 10 lemo
 	interval       = uint64(24 * 3600)                  // 每个lemo地址限制申请测试币的间隔时间为一天
-	getBalanceFlag = "查询余额"                             // 用户发送查询余额请求的前缀标志位
-	AppID          = "wx1f6db98d761e4679"               // 绑定公众号的appid ,只有绑定此公众号上发送过来的用户才能被标记。其他链接此水龙头的公众号上的用户能申请到测试币但是不能被标记。
-	AppSecret      = "fca7d817f6706c240cfbef7d554db891" // 绑定公众号的app秘钥
+	getBalanceFlag = "余额"                               // 用户发送查询余额请求的前缀标志位
+	AppID          = "wx06904bf57c491375"               // 绑定公众号的appid ,只有绑定此公众号上发送过来的用户才能被标记。其他链接此水龙头的公众号上的用户能申请到测试币但是不能被标记。
+	AppSecret      = "b8a85d73ac52df0e5552fb25793382b5" // 绑定公众号的app秘钥
 	TagName        = "开发者"                              // 标记申请测试币的微信用户的组名
 )
 
@@ -190,13 +190,15 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("EventKey:", getRequestBody.EventKey) // 调试用
 			// 判断新用户扫的二维码是否为我们水龙头推广的二维码
 			if getRequestBody.EventKey == "" { // 满足此条件为微信公众号自带的二维码，说明只是用户扫此二维码关注公众号的操作
-				Msg = "感谢关注LemoChain，请添加技术社区客服 Lucy180619 进入Lemo技术社区。"
+				Msg = "欢迎来到LemoChain中文官方社区大本营，点击lemochain.com发现更多关于LemoChain的信息！\n\n1）如果你想知道什么是LemoChain，请点击这里：https://mp.weixin.qq.com/s/9vJ4n7JkVExkolMu1AhDnA\n\n2）我们肯定是整个币圈，最有逼格的团队：https://mp.weixin.qq.com/s/eTjh9MB60VbMLt14mqlYSw\n\n3）说了这么多，LemoChain到底有什么用？https://mp.weixin.qq.com/s/WZcPL__zap14ryR9G3uwZQ\n\n4）既然都这么了解我们了，要不要点击下方【加入社区】成为LemoChain的一员呢？"
 			} else {
 				// 新用户扫码关注推送消息如下
 				if getRequestBody.Event == "subscribe" {
 					Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
 				} else if getRequestBody.Event == "SCAN" { // 已关注的用户扫码进公众号
-					Msg = "感谢使用Lemo测试币水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+					Msg = "感谢使用Lemo水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+				} else {
+					Msg = "欢迎进入LemoChain社区" // 防止给微信的响应为nil从而报错
 				}
 			}
 			responseTextBody, err = makeTextResponseBody(getRequestBody.ToUserName, getRequestBody.FromUserName, Msg)
@@ -243,7 +245,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 
 					// 回复用户消息
 					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n10LEMO测试币将在1个工作日内发放至您的钱包。请添加技术社区客服 Lucy180619 进入Lemo技术社区。\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))
+						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n测试网10LEMO将在1个工作日内发放至您的钱包。请添加技术社区客服微信 Lucy180619 进入Lemo技术社区。\n\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))
 					if err != nil {
 						log.Println("Wechat Service: makeTextResponseBody error:", err)
 						return
@@ -256,15 +258,6 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 						log.Println("Wechat Service: makeTextResponseBody error:", err)
 						return
 					}
-				}
-			} else if textRequestBody != nil && (textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币") {
-				// 给用户提示申请打币的操作
-				var err error
-				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprint("感谢使用Lemo测试币水龙头,请回复您的钱包地址,用于接收LEMO测试币。"))
-				if err != nil {
-					log.Println("Wechat Service: makeTextResponseBody error:", err)
-					return
 				}
 			} else if textRequestBody != nil && IsGetBalancePost(textRequestBody.Content) {
 				// 解析用户地址
@@ -283,20 +276,38 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					balance, err := types.GetBalance(lemoAdd)
 					if err != nil {
 						responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-							fmt.Sprint("查询失败，请检查输入是否正确或者联系社区人员\n"))
+							fmt.Sprint("查询失败，请检查输入是否正确或者联系技术社区客服微信 Lucy180619\n"))
 					} else {
 						responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
 							balance)
 					}
 				}
-			} else { // 用户发送未定义的消息给公众号的返回
-				responseTextBody, _ = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-					fmt.Sprint("输入数据请求无效。"))
+			} else if textRequestBody != nil { // 用户在公众号输入'测试币','水龙头','LemoChain','官网','交易','周报',这些词汇跳转到的回复逻辑如下
+				var respMsg string
+				var err error
+				if textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币" {
+					respMsg = "感谢使用Lemo水龙头,请回复您的钱包地址,用于接收测试网LEMO。"
+				} else if textRequestBody.Content == "LemoChain" || textRequestBody.Content == "lemochain" || textRequestBody.Content == "Lemochain" || textRequestBody.Content == "lemoChain" {
+					respMsg = "LemoChain是一个非盈利社区化的区块链项目，其团队由来自硅谷、新加坡、伦敦、成都等高科技人士组成，为不同行业的应用开发者和服务商提供去中心化的用户账户系统、数据流通服务、 数字资产确权及用户诚信协议，构建未来应用的数字资产生态体系。"
+				} else if textRequestBody.Content == "官网" {
+					respMsg = "藏的那么深还是被你发现了，点击https://www.lemochain.com进入LemoChain更加深入的了解Lemo吧！"
+				} else if textRequestBody.Content == "交易" {
+					respMsg = "LEMO现已上线Gate交易所，点击https://www.gate.io/即可查看哦"
+				} else if textRequestBody.Content == "周报" {
+					respMsg = "谢谢你对我如此关心，点击下方【历史消息】菜单按钮就可以查看往期周报了哦。"
+				} else { // 用户发送的是未定义的text内容
+					respMsg = "感谢关注LemoChain，点击右下角【加入社群】菜单按钮，和柠檬粉们一起嗨～"
+				}
+				responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName, respMsg)
+				if err != nil {
+					log.Println("Wechat Service: makeTextResponseBody error:", err)
+					return
+				}
 			}
 
 		} else { // 如果用户发送的消息是图片、视频、音频等类型，则不处理，以后有需求直接在此处扩展即可。
 			responseTextBody, _ = makeTextResponseBody(judgeMsgType.ToUserName, judgeMsgType.FromUserName,
-				fmt.Sprint("目前公众号还不支持此类消息,请谅解。"))
+				fmt.Sprint("感谢关注LemoChain，点击右下角【加入社群】菜单按钮，和柠檬粉们一起嗨～"))
 		}
 
 		w.Header().Set("Content-Type", "text/xml")
@@ -353,7 +364,7 @@ func main() {
 	// -------------------------------------------------------------- //
 
 	http.HandleFunc("/", procRequest)
-	err = http.ListenAndServe(":80", nil)
+	err = http.ListenAndServe(":8088", nil) // 设置的服务器上nginx反代理监听端口为8088，但是server和微信端交互的端口还是80
 	if err != nil {
 		log.Fatal("Wechat Service: ListenAndServer failed,", err)
 	}

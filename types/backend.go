@@ -18,6 +18,7 @@ const (
 	defaultGasPrice = 1e9
 	defaultGasLimit = 50000
 	chainID         = 100
+	chainUrl        = "http://149.28.68.93:8001" // 连接一个节点的ip地址
 )
 
 // senderLemoAddress = "Lemo83GN72GYH2NZ8BA729Z9TCT7KQ5FC3CR6DJG"
@@ -55,7 +56,7 @@ func SendCoin(content string, amount uint64) (error, string) {
 	fmt.Println(string(jsonData))
 	reader := bytes.NewReader(jsonData)
 	// post
-	resp, err := http.Post("http://127.0.0.1:8001", "application/json;charset=UTF-8", reader)
+	resp, err := http.Post(chainUrl, "application/json;charset=UTF-8", reader)
 	if err != nil {
 		log.Println("post error:", err)
 		return err, ""
@@ -114,7 +115,7 @@ func GetBalance(lemoAddress string) (string, error) {
 		return "", err
 	}
 	reader := bytes.NewReader(jsonData)
-	resp, err := http.Post("http://127.0.0.1:8001", "application/json;charset=UTF-8", reader)
+	resp, err := http.Post(chainUrl, "application/json;charset=UTF-8", reader)
 	if err != nil {
 		log.Println("post error:", err)
 		return "", err

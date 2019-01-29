@@ -25,6 +25,8 @@ const (
 	AppID          = "wx06904bf57c491375"               // 绑定公众号的appid ,只有绑定此公众号上发送过来的用户才能被标记。其他链接此水龙头的公众号上的用户能申请到测试币但是不能被标记。
 	AppSecret      = "b8a85d73ac52df0e5552fb25793382b5" // 绑定公众号的app秘钥
 	TagName        = "开发者"                              // 标记申请测试币的微信用户的组名
+	// AppID     = "wx1f6db98d761e4679"
+	// AppSecret = "fca7d817f6706c240cfbef7d554db891"
 )
 
 // 存储access_token 的全局变量

@@ -18,7 +18,8 @@ const (
 	defaultGasPrice = 1e9
 	defaultGasLimit = 50000
 	chainID         = 100
-	chainUrl        = "http://149.28.68.93:8001" // 连接一个节点的ip地址
+	chainUrl        = "http://47.99.139.137:8001" // 连接一个节点的ip地址
+	// chainUrl = "http://127.0.0.1:8001"
 )
 
 // senderLemoAddress = "Lemo83GN72GYH2NZ8BA729Z9TCT7KQ5FC3CR6DJG"

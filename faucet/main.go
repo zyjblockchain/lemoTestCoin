@@ -4,6 +4,7 @@ import (
 	"crypto/sha1"
 	"encoding/xml"
 	"fmt"
+	"github.com/lemoTestCoin/common/crypto"
 	"github.com/lemoTestCoin/manager"
 	"github.com/lemoTestCoin/store"
 	"github.com/lemoTestCoin/types"
@@ -192,13 +193,13 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 			fmt.Println("EventKey:", getRequestBody.EventKey) // 调试用
 			// 判断新用户扫的二维码是否为我们水龙头推广的二维码
 			if getRequestBody.EventKey == "" { // 满足此条件为微信公众号自带的二维码，说明只是用户扫此二维码关注公众号的操作
-				Msg = "欢迎来到LemoChain中文官方社区大本营，点击lemochain.com发现更多关于LemoChain的信息！\n\n1）如果你想知道什么是LemoChain，请点击这里：https://mp.weixin.qq.com/s/9vJ4n7JkVExkolMu1AhDnA\n\n2）我们肯定是整个币圈，最有逼格的团队：https://mp.weixin.qq.com/s/eTjh9MB60VbMLt14mqlYSw\n\n3）说了这么多，LemoChain到底有什么用？https://mp.weixin.qq.com/s/WZcPL__zap14ryR9G3uwZQ\n\n4）既然都这么了解我们了，要不要点击下方【加入社区】成为LemoChain的一员呢？"
+				Msg = "欢迎来到LemoChain中文官方社区大本营，点击lemochain.com发现更多关于LemoChain的信息！\n\n1）如果你想知道什么是LemoChain，请点击这里：https://mp.weixin.qq.com/s/9vJ4n7JkVExkolMu1AhDnA\n\n2）我们肯定是整个币圈，最有逼格的团队：https://mp.weixin.qq.com/s/eTjh9MB60VbMLt14mqlYSw\n\n3）说了这么多，LemoChain到底有什么用？https://mp.weixin.qq.com/s/WZcPL__zap14ryR9G3uwZQ\n\n4）既然都这么了解我们了，要不要点击下方【加入社区】成为LemoChain的一员呢？\n\n5）Lemo测试网已上线，回复'水龙头'获取测试网Lemo。"
 			} else {
 				// 新用户扫码关注推送消息如下
 				if getRequestBody.Event == "subscribe" {
-					Msg = "欢迎关注LemoChain,如需领取lemo测试币,请在公众号下方直接输入您的Lemo地址。"
+					Msg = "欢迎关注LemoChain,如需领取测试网Lemo,请在公众号下方直接输入您的Lemo地址。"
 				} else if getRequestBody.Event == "SCAN" { // 已关注的用户扫码进公众号
-					Msg = "感谢使用Lemo水龙头，请回复您的钱包地址，用于接收LEMO测试币。"
+					Msg = "感谢使用Lemo水龙头，请回复您的钱包地址，用于接收测试网Lemo。"
 				} else {
 					Msg = "欢迎进入LemoChain社区" // 防止给微信的响应为nil从而报错
 				}
@@ -242,12 +243,10 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 							log.Println("给用户标记标签error:", err)
 							return
 						}
-
 					}
-
 					// 回复用户消息
 					responseTextBody, err = makeTextResponseBody(textRequestBody.ToUserName, textRequestBody.FromUserName,
-						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n测试网10LEMO将在1个工作日内发放至您的钱包。请添加技术社区客服微信 Lucy180619 进入Lemo技术社区。\n\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))
+						fmt.Sprintf("请再次确认您的lemo地址\n%s \n\n测试网10LEMO将在1个工作日内发放至您的钱包。\n请添加技术社区客服微信 Lucy180619 进入Lemo技术社区。\n\n此次交易的哈希为%s\n", textRequestBody.Content, txHash))
 					if err != nil {
 						log.Println("Wechat Service: makeTextResponseBody error:", err)
 						return
@@ -288,7 +287,7 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 				var respMsg string
 				var err error
 				if textRequestBody.Content == "水龙头" || textRequestBody.Content == "测试币" {
-					respMsg = "感谢使用Lemo水龙头,请回复您的钱包地址,用于接收测试网LEMO。"
+					respMsg = "感谢使用Lemo水龙头,请回复您的Lemo地址,用于接收测试网LEMO。\n若无Lemo地址，请回复'申请测试账户'获取Lemo地址。"
 				} else if textRequestBody.Content == "LemoChain" || textRequestBody.Content == "lemochain" || textRequestBody.Content == "Lemochain" || textRequestBody.Content == "lemoChain" {
 					respMsg = "LemoChain是一个非盈利社区化的区块链项目，其团队由来自硅谷、新加坡、伦敦、成都等高科技人士组成，为不同行业的应用开发者和服务商提供去中心化的用户账户系统、数据流通服务、 数字资产确权及用户诚信协议，构建未来应用的数字资产生态体系。"
 				} else if textRequestBody.Content == "官网" {
@@ -297,6 +296,12 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					respMsg = "LEMO现已上线Gate交易所，点击https://www.gate.io/即可查看哦"
 				} else if textRequestBody.Content == "周报" {
 					respMsg = "谢谢你对我如此关心，点击下方【历史消息】菜单按钮就可以查看往期周报了哦。"
+				} else if textRequestBody.Content == "申请测试账户" {
+					accountKey, _ := crypto.GenerateAddress()
+					LemoAddr := accountKey.Address
+					// PubKey := accountKey.Public
+					Private := accountKey.Private
+					respMsg = fmt.Sprintf("该账户仅供测试网使用，请妥善保存您的地址及私钥。\n\n复制并回复您以Lemo开头的地址，即可获取测试网LEMO，测试网LEMO仅供测试网使用。\n\n私钥：\n%s\n地址：\n%s", Private, LemoAddr)
 				} else { // 用户发送的是未定义的text内容
 					respMsg = "感谢关注LemoChain，点击右下角【加入社群】菜单按钮，和柠檬粉们一起嗨～"
 				}

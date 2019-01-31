@@ -2,6 +2,8 @@ package crypto
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -96,4 +98,28 @@ func toECDSA(d []byte, strict bool) (*ecdsa.PrivateKey, error) {
 		return nil, errors.New("invalid private key")
 	}
 	return priv, nil
+}
+
+func FromECDSAPub(pub *ecdsa.PublicKey) []byte {
+	if pub == nil || pub.X == nil || pub.Y == nil {
+		return nil
+	}
+	return elliptic.Marshal(S256(), pub.X, pub.Y)
+}
+
+func GenerateKey() (*ecdsa.PrivateKey, error) {
+	return ecdsa.GenerateKey(S256(), rand.Reader)
+}
+
+func PubkeyToAddress(p ecdsa.PublicKey) common.Address {
+	pubBytes := FromECDSAPub(&p)
+	return PubToAddress(pubBytes)
+}
+
+// FromECDSA exports a private key into a binary dump.
+func FromECDSA(priv *ecdsa.PrivateKey) []byte {
+	if priv == nil {
+		return nil
+	}
+	return math.PaddedBigBytes(priv.D, priv.Params().BitSize/8)
 }

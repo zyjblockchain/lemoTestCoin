@@ -302,6 +302,8 @@ func procRequest(w http.ResponseWriter, r *http.Request) {
 					// PubKey := accountKey.Public
 					Private := accountKey.Private
 					respMsg = fmt.Sprintf("该账户仅供测试网使用，请妥善保存您的地址及私钥。\n\n复制并回复您以Lemo开头的地址，即可获取测试网LEMO，测试网LEMO仅供测试网使用。\n\n私钥：\n%s\n地址：\n%s", Private, LemoAddr)
+				} else if textRequestBody.Content == "214" || textRequestBody.Content == "情人节" {
+					respMsg = "感谢参与Lemo情人节活动！\n\n点击下面链接，填写领奖信息\n\n海量LEMO等你拿！\n\nhttps://dwz.cn/UvOjE9Ci"
 				} else { // 用户发送的是未定义的text内容
 					respMsg = "感谢关注LemoChain，点击右下角【加入社群】菜单按钮，和柠檬粉们一起嗨～"
 				}

@@ -3,18 +3,16 @@ package types
 import (
 	"crypto/ecdsa"
 	"errors"
-	"fmt"
 	"github.com/lemoTestCoin/common/crypto"
 	"github.com/lemoTestCoin/common/crypto/sha3"
 	"github.com/lemoTestCoin/common/rlp"
 
 	"github.com/lemoTestCoin/common"
-
-	"math/big"
 )
 
 var (
-	ErrPublicKey = errors.New("invalid public key")
+	ErrPublicKey   = errors.New("invalid public key")
+	ErrNoSignsData = errors.New("no signature data")
 )
 
 // MakeSigner returns a Signer based on the given version and chainID.
@@ -22,23 +20,36 @@ func MakeSigner() Signer {
 	return DefaultSigner{}
 }
 
-// SignTx signs the transaction using the given signer and private key
-func SignTx(tx *Transaction, s Signer, prv *ecdsa.PrivateKey) (*Transaction, error) {
-	h := s.Hash(tx)
-	sig, err := crypto.Sign(h[:], prv)
-	if err != nil {
-		return nil, err
+// recoverSigners
+func recoverSigners(sigHash common.Hash, sigs [][]byte) ([]common.Address, error) {
+	length := len(sigs)
+	if length == 0 {
+		return nil, ErrNoSignsData
 	}
-	return tx.WithSignature(s, sig)
+	signers := make([]common.Address, length, length)
+	for i := 0; i < length; i++ {
+		// recover the public key from the signature
+		pub, err := crypto.Ecrecover(sigHash[:], sigs[i])
+		if err != nil {
+			return nil, err
+		}
+		if len(pub) == 0 || pub[0] != 4 {
+			return nil, ErrPublicKey
+		}
+		addr := crypto.PubToAddress(pub)
+		signers[i] = addr
+	}
+	return signers, nil
 }
 
 // Signer encapsulates transaction signature handling.
 type Signer interface {
-	// Sender returns the sender address of the transaction.
-	GetSender(tx *Transaction) (common.Address, error)
-	// ParseSignature returns the raw R, S, V values corresponding to the
-	// given signature.
-	ParseSignature(tx *Transaction, sig []byte) (r, s, v *big.Int, err error)
+	// SignTx returns transaction after signature
+	SignTx(tx *Transaction, prv *ecdsa.PrivateKey) (*Transaction, error)
+
+	// GetSigners returns the sender address of the transaction.
+	GetSigners(tx *Transaction) ([]common.Address, error)
+
 	// Hash returns the hash to be signed.
 	Hash(tx *Transaction) common.Hash
 }
@@ -47,60 +58,40 @@ type Signer interface {
 type DefaultSigner struct {
 }
 
-func (s DefaultSigner) GetSender(tx *Transaction) (common.Address, error) {
-	sigHash := s.Hash(tx)
-	V, R, S := tx.data.V, tx.data.R, tx.data.S
+func (s DefaultSigner) SignTx(tx *Transaction, prv *ecdsa.PrivateKey) (*Transaction, error) {
+	h := s.Hash(tx)
 
-	if V.BitLen() > 32 {
-		return common.Address{}, ErrInvalidSig
-	}
-	_, _, v, _ := ParseV(V)
-	if !crypto.ValidateSignatureValues(v, R, S) {
-		return common.Address{}, ErrInvalidSig
-	}
-	// encode the signature in uncompressed format
-	rb, sb := R.Bytes(), S.Bytes()
-	sig := make([]byte, 65)
-	copy(sig[32-len(rb):32], rb)
-	copy(sig[64-len(sb):64], sb)
-	sig[64] = v
-	// recover the public key from the signature
-	pub, err := crypto.Ecrecover(sigHash[:], sig)
+	sig, err := crypto.Sign(h[:], prv)
 	if err != nil {
-		return common.Address{}, err
+		return nil, err
 	}
-	if len(pub) == 0 || pub[0] != 4 {
-		return common.Address{}, ErrPublicKey
-	}
-	addr := crypto.PubToAddress(pub)
-	return addr, nil
+	cpy := tx.Clone()
+	cpy.data.Sigs = append(cpy.data.Sigs, sig)
+	return cpy, nil
 }
 
-// ParseSignature returns a new transaction with the given signature. This signature
-// needs to be in the [R || S || V] format where V is 0 or 1.
-func (s DefaultSigner) ParseSignature(tx *Transaction, sig []byte) (R, S, V *big.Int, err error) {
-	if len(sig) != 65 {
-		panic(fmt.Sprintf("wrong size for signature: got %d, want 65", len(sig)))
-	}
-	R = new(big.Int).SetBytes(sig[:32])
-	S = new(big.Int).SetBytes(sig[32:64])
-	V = SetSecp256k1V(tx.data.V, sig[64])
-	return R, S, V, nil
-}
+func (s DefaultSigner) GetSigners(tx *Transaction) ([]common.Address, error) {
+	sigHash := s.Hash(tx)
 
-// Hash returns the hash to be signed by the sender.
-// It does not uniquely identify the transaction.
+	sigs := tx.data.Sigs
+	signers, err := recoverSigners(sigHash, sigs)
+	return signers, err
+}
 func (s DefaultSigner) Hash(tx *Transaction) common.Hash {
+	hashData := getHashData(tx)
+
 	return rlpHash([]interface{}{
 		tx.Type(),
 		tx.Version(),
 		tx.ChainID(),
+		tx.data.From,
+		tx.data.GasPayer,
 		tx.data.Recipient,
 		tx.data.RecipientName,
 		tx.data.GasPrice,
 		tx.data.GasLimit,
 		tx.data.Amount,
-		tx.data.Data,
+		hashData,
 		tx.data.Expiration,
 		tx.data.Message,
 	})

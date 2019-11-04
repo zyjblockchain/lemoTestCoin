@@ -22,8 +22,9 @@ const (
 	// chainUrl = "http://127.0.0.1:8001"
 )
 
-// senderLemoAddress = "Lemo83GN72GYH2NZ8BA729Z9TCT7KQ5FC3CR6DJG"
+var senderLemoAddress = "Lemo83GN72GYH2NZ8BA729Z9TCT7KQ5FC3CR6DJG"
 var SenderToPrivate, _ = crypto.HexToECDSA("c21b6b2fbf230f665b936194d14da67187732bf9d28768aef1a3cbb26608f8aa")
+var from, _ = common.StringToAddress(senderLemoAddress)
 
 // 与glemo交互发送交易
 func SendCoin(content string, amount uint64) (error, string) {
@@ -33,7 +34,7 @@ func SendCoin(content string, amount uint64) (error, string) {
 		return err, ""
 	}
 	// 生成交易
-	wxTx := NewTransaction(to, new(big.Int).SetUint64(amount), defaultGasLimit, new(big.Int).SetUint64(defaultGasPrice), []byte{}, chainID, uint64(time.Now().Unix()+30*60), "wx", "water faucet")
+	wxTx := NewTransaction(from, to, new(big.Int).SetUint64(amount), defaultGasLimit, new(big.Int).SetUint64(defaultGasPrice), []byte{}, 0, chainID, uint64(time.Now().Unix()+30*60), "wx", "water faucet")
 	// 签名交易
 	signWxTx := SignTransaction(wxTx, SenderToPrivate)
 	txData, err := signWxTx.MarshalJSON()
